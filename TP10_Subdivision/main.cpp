@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include <GL/freeglut.h>
 #include "struct.h"
+#include <vector>
 
 /* au cas ou M_PI ne soit defini */
 #ifndef M_PI
@@ -37,74 +38,44 @@ int Ordre = 4;
 // Point de controle selectionné
 int numPoint = 0;
 
-// Fonction Factorielle
-float fact(int n)
+void drawChaikin(const std::vector<point3> &tab, const int ordre, const point3 &color)
 {
-	if (n <= 0)
-		return 1;
-	return n * fact(n - 1);
-}
-
-float Bernstein(int i, int n, float t)
-{
-	return (fact(n) / (fact(i) * fact(n - i))) * powf(t, i) * powf(1 - t, n - i);
-}
-
-void drawHermite(point3 p0, point3 p1, point3 v0, point3 v1)
-{
-	glBegin(GL_LINE_STRIP);
-	for (float u = 0.f; u <= 1.f; u += 0.01f)
+	if (ordre == 0)
 	{
-		const float u3 = u * u * u;
-		const float u2 = u * u;
-		const float f1 = 2.f * u3 - 3.f * u2 + 1.f;
-		const float f2 = -2.f * u3 + 3.f * u2;
-		const float f3 = u3 - 2.f * u2 + u;
-		const float f4 = u3 - u2;
-		point3 p((p0 * f1) + (p1 * f2) + (v0 * f3) + (v1 * f4));
-		glVertex3f(p.x, p.y, p.z);
-	}
-	glEnd();
-}
-
-void drawBezier(point3 * TabPC, unsigned int Ordre)
-{
-	glColor3f(0.f, 1.f, 0.f);
-	glBegin(GL_LINE_STRIP);
-	for (float t = 0.f; t <= 1.f; t += 0.01f)
-	{
-		point3 acc(0.f, 0.f, 0.f);
-		for (int i = 0; i < Ordre; i++)
+		if (tab.size() > 0)
 		{
-			acc = acc + point3(TabPC[i] * Bernstein(i, Ordre - 1, t));
-
+			glColor3f(color.x, color.y, color.z);
+			glBegin(GL_LINE_STRIP);
+			point3 p;
+			for (int i = 0; i < tab.size(); i++)
+			{
+				p = tab[i];
+				glVertex3f(p.x, p.y, p.z);
+			}
+			p = tab[0];
+			glVertex3f(p.x, p.y, p.z);
+			glEnd();
 		}
-		glVertex3f(acc.x, acc.y, acc.z);
 	}
-	glEnd();
-
-}
-
-void addContrainteBezier2C0(point3 * TabPC1, point3 * TabPC2, const int Ordre1, const int Ordre2)
-{
-	TabPC2[0] = TabPC1[Ordre1 - 1];
-}
-
-void addContrainteBezier2C1(point3 * TabPC1, point3 * TabPC2, const int Ordre1, const int Ordre2)
-{
-	TabPC2[0] = TabPC1[Ordre1 - 1];
-	point3 vecOffset = TabPC1[Ordre1 - 1] - TabPC1[Ordre1 - 2];
-	TabPC2[1] = TabPC1[Ordre1 - 1] + vecOffset;
-}
-
-void drawEnveloppe(point3 * TabPC, const int Ordre)
-{
-	glBegin(GL_LINE_STRIP);
-	for (int i = 0; i < Ordre; i++)
+	else
 	{
-		glVertex3f(TabPC[i].x, TabPC[i].y, TabPC[i].z);
+		std::vector<point3> new_tab;
+
+		for (int i = 0; i < tab.size(); i++)
+		{
+			point3 p1(tab[i]);
+
+			point3 p2 = (i < tab.size() - 1 ? tab[i + 1] : tab[0]);
+
+			point3 q(p1 * 0.75 + p2 * 0.25);
+			point3 r(p1 * 0.25 + p2 * 0.75);
+
+			new_tab.push_back(q);
+			new_tab.push_back(r);
+		}
+
+		drawChaikin(new_tab, ordre - 1, color);
 	}
-	glEnd();
 }
 
 /* initialisation d'OpenGL*/
@@ -120,31 +91,9 @@ void display(void)
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 
-	TabPC[numPoint] = TabPC[numPoint] + point3(tx, ty, 0);
-
-	// Contraintes classe C
-	//addContrainteBezier2C1(TabPC, TabPC2, Ordre, Ordre);
-
-	// Enveloppe des points de controles
-	glColor3f(1.0, 1.0, 0.0);
-	drawEnveloppe(TabPC, Ordre);
-	drawEnveloppe(TabPC2, Ordre);
-
-	// Affichage du point de controle courant
-	// On se déplace ensuite avec + et - 
-	// ° d'un point de contrôle au suivant (+)
-	// ° d'un point de contrôle au précédent (-)
-	glColor3f(0.0, 0.0, 1.0);
-	glBegin(GL_LINE_LOOP);
-	glVertex3f(TabPC[numPoint].x + 0.1f, TabPC[numPoint].y + 0.1f, TabPC[numPoint].z);
-	glVertex3f(TabPC[numPoint].x + 0.1f, TabPC[numPoint].y - 0.1f, TabPC[numPoint].z);
-	glVertex3f(TabPC[numPoint].x - 0.1f, TabPC[numPoint].y - 0.1f, TabPC[numPoint].z);
-	glVertex3f(TabPC[numPoint].x - 0.1f, TabPC[numPoint].y + 0.1f, TabPC[numPoint].z);
-	glEnd();
-
-	// Courbe de Bézier
-	drawBezier(TabPC, Ordre);
-	drawBezier(TabPC2, Ordre);
+	std::vector<point3> tab = { point3(-10., -10., 0.), point3(-6.,6, 0.), point3(6., 10., 0.), point3(10., 5., 0.), point3(7., -6., 0.), point3(-2., -12., 0.) };
+	drawChaikin(tab, 0, point3(0, 255, 0));
+	drawChaikin(tab, 4, point3(255, 0, 0));
 
 	glEnd();
 	glFlush();
@@ -156,7 +105,7 @@ void reshape(int w, int h)
 	glViewport(0, 0, (GLsizei)w, (GLsizei)h);
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
-	//  glOrtho(-20, 20, -20, 20, -10, 10);
+	  glOrtho(-10, 10, -10, 10, -10, 10);
 	glOrtho(-3, 3, -3, 3, -1, 1);
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
